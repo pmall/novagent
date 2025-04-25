@@ -9,9 +9,17 @@ class LiteLLMModel:
         self.api_key = api_key
         self.api_base = api_base
 
-    def __call__(self, messages: list[dict]) -> str:
+    def __call__(self, messages: list[dict]) -> tuple[str, int | None, int | None]:
         response = completion(
             model=self.model_id, api_key=self.api_key, messages=messages
         )
 
-        return response.choices[0].message.content
+        message = response.choices[0].message.content
+
+        usage = response.get("usage", {})
+
+        return (
+            message,
+            usage.get("prompt_tokens", None),
+            usage.get("completion_tokens", None),
+        )

@@ -31,4 +31,4 @@ class PythonContext:
             sys.stdout = old_stdout
             sys.stderr = old_stderr
 
-        return sys_out.getvalue(), sys_err.getvalue()
+        return sys_out.getvalue().strip(), sys_err.getvalue().strip()
