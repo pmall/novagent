@@ -1,7 +1,7 @@
 import os
-from agent import Novagent
-from models import LiteLLMModel
-from loggers import LogLevel
+from novagent.agent import Novagent
+from novagent.models import LiteLLMModel
+from novagent.loggers import LogLevel
 
 API_KEY = os.getenv("LITELLM_API_KEY")
 MODEL_ID = os.getenv("LITELLM_MODEL_ID")
@@ -14,6 +14,10 @@ AUTHORIZED_IMPORTS = [
     "json",
     "csv",
     "datetime",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "openpyxl",
 ]
 
 if __name__ == "__main__":
@@ -28,8 +32,6 @@ if __name__ == "__main__":
     agent = Novagent(
         model, log_level=LogLevel.VERBOSE, authorized_imports=AUTHORIZED_IMPORTS
     )
-
-    agent.update_system_prompt(lambda x, xs: x)
 
     agent.run(args.task)
 
