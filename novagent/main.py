@@ -25,7 +25,11 @@ if __name__ == "__main__":
 
     model = LiteLLMModel(api_key=API_KEY, model_id=MODEL_ID)
 
-    agent = Novagent(model, log_level=LogLevel.VERBOSE)
+    agent = Novagent(
+        model, log_level=LogLevel.VERBOSE, authorized_imports=AUTHORIZED_IMPORTS
+    )
+
+    agent.update_system_prompt(lambda x, xs: x)
 
     agent.run(args.task)
 

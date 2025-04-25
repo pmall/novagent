@@ -11,23 +11,24 @@ class Novagent:
         self,
         model: Callable[[list[dict]], str],
         context: PythonContext | None = None,
-        authorized_imports: list[str] = [],
         logger: Callable[[str, str | None], None] | None = None,
         log_level: LogLevel | None = LogLevel.NORMAL,
+        authorized_imports: list[str] = [],
     ):
         self.model = model
 
         self.context = context or PythonContext()
         self.log = logger or CliLogger(level=log_level)
+        self.authorized_imports = authorized_imports
 
-        self.system_prompt = self._build_system_prompt(authorized_imports)
+        self.system_prompt = self._build_system_prompt()
 
         self.clear()
 
     def update_system_prompt(self, updater: Callable[[str, list[str]], str]):
-        self.system_promp = updater(self.system_promp, self.authorized_imports)
+        self.system_prompt = updater(self.system_prompt, self.authorized_imports)
 
-        if not isinstance(self.system_promp, str):
+        if not isinstance(self.system_prompt, str):
             raise ValueError("System prompt updater must return a string.")
 
         self.clear()
@@ -102,7 +103,7 @@ class Novagent:
 
         return self.context.final_answer_value
 
-    def _build_system_prompt(self, authorized_imports: list[str]):
+    def _build_system_prompt(self):
         system_prompt_tpl_path = Path(__file__).parent / "system_prompt.txt"
 
         with open(system_prompt_tpl_path) as f:
@@ -110,7 +111,7 @@ class Novagent:
 
         return (
             Template(system_prompt_tpl)
-            .substitute(authorized_imports=authorized_imports)
+            .substitute(authorized_imports=self.authorized_imports)
             .strip()
         )
 
