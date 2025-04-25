@@ -1,4 +1,5 @@
 import re
+import sys
 from typing import Callable
 from context import PythonContext
 from loggers import LogLevel, CliLogger
@@ -77,13 +78,15 @@ class Novagent:
             if not code:
                 self.log(thought, "thought")
                 self.log("agent did not produced code.", "error")
-                continue
+                sys.exit()
 
             # handle the produced code.
             self.log(thought, "thought")
             self.log(code, "code")
 
-            self._add_assistant_message(thought + "\n" + code)
+            self._add_assistant_message(
+                thought + "\n" + "```py\n" + code + "\n```<end_code>"
+            )
 
             out, err = self.context.run(code)
 
