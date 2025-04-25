@@ -18,7 +18,7 @@ class Novagent:
 
     def __init__(
         self,
-        model: Callable[[list[dict]], str],
+        model: Callable[[list[dict]], str | tuple[str, int | None, int | None]],
         context: PythonContext | None = None,
         logger: Callable[[str, str | None], None] | None = None,
         log_level: LogLevel | None = LogLevel.NORMAL,

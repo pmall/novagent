@@ -35,8 +35,6 @@ if __name__ == "__main__":
         model, log_level=LogLevel.VERBOSE, extra_instructions=EXTRA_INSTRUCTIONS
     )
 
-    print(agent.system_prompt)
-
     agent.run(args.task)
 
     while True:
