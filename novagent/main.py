@@ -1,24 +1,26 @@
 import os
-from novagent.agent import Novagent
-from novagent.models import LiteLLMModel
-from novagent.loggers import LogLevel
+from agent import Novagent
+from models import LiteLLMModel
+from loggers import LogLevel
 
 API_KEY = os.getenv("LITELLM_API_KEY")
 MODEL_ID = os.getenv("LITELLM_MODEL_ID")
 
-AUTHORIZED_IMPORTS = [
-    "os",
-    "sys",
-    "math",
-    "re",
-    "json",
-    "csv",
-    "datetime",
-    "numpy",
-    "pandas",
-    "matplotlib",
-    "openpyxl",
-]
+EXTRA_INSTRUCTIONS = """
+### Guidelines for Data Analysis
+
+- **No Internet Access:**  
+  Do **not** attempt to download or fetch external resources. You must work **only** with the provided local files.
+
+- **Inspect the Data First:**  
+  Before starting any analysis, preview a few rows to understand the structure and contents.
+
+- **Excel Files – Multiple Sheets:**  
+  Always check for multiple sheets in Excel files. Never assume the structure is based on the first sheet alone.
+
+- **Missing or Inadequate Data:**  
+  If no suitable data is found for the task, clearly state the issue and stop the analysis.
+""".strip()
 
 if __name__ == "__main__":
     import argparse
@@ -30,8 +32,10 @@ if __name__ == "__main__":
     model = LiteLLMModel(api_key=API_KEY, model_id=MODEL_ID)
 
     agent = Novagent(
-        model, log_level=LogLevel.VERBOSE, authorized_imports=AUTHORIZED_IMPORTS
+        model, log_level=LogLevel.VERBOSE, extra_instructions=EXTRA_INSTRUCTIONS
     )
+
+    print(agent.system_prompt)
 
     agent.run(args.task)
 
