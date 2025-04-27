@@ -18,10 +18,13 @@ class LiteLLMModel:
 
     def __call__(self, messages: list[dict]) -> tuple[str, int | None, int | None]:
         response = completion(
-            model=self.model_id, api_key=self.api_key, messages=messages
+            model=self.model_id,
+            api_key=self.api_key,
+            api_base=self.api_base,
+            messages=messages,
         )
 
-        self.trace_logger(messages, response)
+        self.trace_logger(messages, response.to_dict())
 
         message = response.choices[0].message.content
 

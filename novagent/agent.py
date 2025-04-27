@@ -1,8 +1,7 @@
 import re
-import sys
 from typing import Callable
 from context import PythonContext
-from loggers import LogLevel, CliLogger
+from loggers import LogLevel, LogAction, DummyLogger
 from system_prompt import default_system_prompt_template
 
 
@@ -29,7 +28,7 @@ class Novagent:
     ):
         self.model = model
         self.context = context or PythonContext()
-        self.log = logger or CliLogger(level=log_level)
+        self.log = logger or DummyLogger(level=log_level)
 
         self.authorized_imports = (
             authorized_imports or Novagent.DEFAULT_AUTHORIZED_IMPORTS
@@ -59,7 +58,7 @@ class Novagent:
         self.context.clear_final_answer()
 
         # start by adding the task in the message list.
-        self.log(f"Task: {task}", "info")
+        self.log(f"Task: {task}", LogAction.INFO)
 
         self._add_user_message(f"Task: {task}")
 
@@ -70,19 +69,19 @@ class Novagent:
 
             # update the current step info and log it.
             self.nsteps += 1
-            self.log(f"Step {self.nsteps}:", "info")
+            self.log(f"Step {self.nsteps}:", LogAction.INFO)
 
             # try to extract thought and code from the model response.
             thought, code = self._extract_thought_and_code(message)
 
             if not code:
-                self.log(thought, "thought")
-                self.log("agent did not produced code.", "error")
-                sys.exit()
+                self.log(thought, LogAction.THOUGHT)
+                self.log("agent did not produced code.", LogAction.ERROR)
+                continue
 
             # handle the produced code.
-            self.log(thought, "thought")
-            self.log(code, "code")
+            self.log(thought, LogAction.THOUGHT)
+            self.log(code, LogAction.CODE)
 
             self._add_assistant_message(
                 thought + "\n" + "```py\n" + code + "\n```<end_code>"
@@ -92,17 +91,17 @@ class Novagent:
 
             # no final answer yet so we add the produced messages to the list and loop.
             if self.context.has_final_answer:
-                self.log(self.context.final_answer_value, "final")
+                self.log(self.context.final_answer_value, LogAction.FINAL)
                 self._add_user_message(f"Final:\n{self.context.final_answer_value}")
             else:
                 parts = []
 
                 if len(out) > 0:
-                    self.log(out, "output")
+                    self.log(out, LogAction.OUTPUT)
                     parts.append(out)
 
                 if len(err) > 0:
-                    self.log(err, "error")
+                    self.log(err, LogAction.ERROR)
                     parts.append(err)
 
                 self._add_user_message(f"Observation:\n{"\n".join(parts)}")
@@ -158,17 +157,17 @@ class Novagent:
         if self.in_tokens and not self.out_tokens:
             self.log(
                 f"Total tokens {self.in_tokens} (in: {self.in_tokens}  - out: ?)",
-                "info",
+                LogAction.INFO,
             )
 
         if not self.in_tokens and self.out_tokens:
             self.log(
                 f"Total tokens {self.out_tokens} (in: ? - out: {self.out_tokens})",
-                "info",
+                LogAction.INFO,
             )
 
         if self.in_tokens and self.out_tokens:
             self.log(
                 f"Total tokens {self.in_tokens + self.out_tokens} (in: {self.in_tokens} - out: {self.out_tokens})",
-                "info",
+                LogAction.INFO,
             )

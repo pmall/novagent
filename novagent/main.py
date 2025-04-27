@@ -1,7 +1,8 @@
 import os
 from agent import Novagent
 from models import LiteLLMModel
-from loggers import LogLevel
+from loggers import LogLevel, CliLogger
+from trace_loggers import DummyTraceLogger
 
 API_KEY = os.getenv("LITELLM_API_KEY")
 MODEL_ID = os.getenv("LITELLM_MODEL_ID")
@@ -29,10 +30,15 @@ if __name__ == "__main__":
     parser.add_argument("task", type=str, help="The task to solve using the code agent")
     args = parser.parse_args()
 
+    logger = CliLogger(level=LogLevel.VERBOSE)
+
     model = LiteLLMModel(api_key=API_KEY, model_id=MODEL_ID)
 
     agent = Novagent(
-        model, log_level=LogLevel.VERBOSE, extra_instructions=EXTRA_INSTRUCTIONS
+        model,
+        log_level=LogLevel.VERBOSE,
+        logger=logger,
+        extra_instructions=EXTRA_INSTRUCTIONS,
     )
 
     agent.run(args.task)
