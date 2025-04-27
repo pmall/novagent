@@ -1,5 +1,6 @@
 from typing import Callable
 from litellm import completion
+from system_prompt import END_CODE_TAG
 from trace_loggers import DummyTraceLogger
 
 
@@ -22,6 +23,8 @@ class LiteLLMModel:
             api_key=self.api_key,
             api_base=self.api_base,
             messages=messages,
+            stop=END_CODE_TAG,
+            drop_params=True,
         )
 
         self.trace_logger(messages, response.to_dict())

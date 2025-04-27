@@ -2,7 +2,7 @@ import re
 from typing import Callable
 from context import PythonContext
 from loggers import LogLevel, LogAction, DummyLogger
-from system_prompt import default_system_prompt_template
+from system_prompt import END_CODE_TAG, default_system_prompt_template
 
 
 class Novagent:
@@ -83,9 +83,7 @@ class Novagent:
             self.log(thought, LogAction.THOUGHT)
             self.log(code, LogAction.CODE)
 
-            self._add_assistant_message(
-                thought + "\n" + "```py\n" + code + "\n```<end_code>"
-            )
+            self._add_assistant_message(f"{thought}\n```py\n{code}\n```{END_CODE_TAG}")
 
             out, err = self.context.run(code)
 
@@ -143,13 +141,13 @@ class Novagent:
         self.messages.append({"role": "assistant", "content": content})
 
     def _extract_thought_and_code(self, text: str) -> tuple[str, str | None]:
-        parts_match = re.match(r"(.*?)```py(.*?)<end_code>", text, re.DOTALL)
+        parts_match = re.match(rf"(.*?)```py(.*?)```", text, re.DOTALL)
 
         if not parts_match:
             return text, None
 
         thought = parts_match.group(1).strip()
-        code = parts_match.group(2).rstrip("`").strip()
+        code = parts_match.group(2).strip()
 
         return thought, code
 
