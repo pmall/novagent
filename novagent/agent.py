@@ -1,11 +1,12 @@
 import re
 from typing import Callable
+from models import ModelWrapper
 from context import PythonContext
 from outputs import MessageType, DummyOutput
 from system_prompt import END_CODE_TAG, default_system_prompt_template
 
 
-class Novagent:
+class NovagentConfig:
     DEFAULT_AUTHORIZED_IMPORTS = [
         "os",
         "sys",
@@ -20,17 +21,15 @@ class Novagent:
         self,
         model: Callable[[list[dict]], str | tuple[str, int | None, int | None]],
         context: PythonContext | None = None,
-        output: Callable[[str, str | None], None] | None = None,
         authorized_imports: list[str] = [],
         extra_instructions: str | None = None,
         system_prompt_template: Callable[[list[str], list[str], list[str]], str] = None,
     ):
-        self.model = model
+        self.model = ModelWrapper(model)
         self.context = context or PythonContext()
-        self.output = output or DummyOutput()
 
         self.authorized_imports = (
-            authorized_imports or Novagent.DEFAULT_AUTHORIZED_IMPORTS
+            authorized_imports or NovagentConfig.DEFAULT_AUTHORIZED_IMPORTS
         )
 
         self.system_prompt = (
@@ -41,15 +40,28 @@ class Novagent:
             )
         )
 
-        # init stateful params
-        self.clear()
+    def session(self, output: Callable[[str, str | None], None] | None = None):
+        return NovagentSession(
+            self.model, self.context, output or DummyOutput, self.system_prompt
+        )
 
-    def clear(self):
+
+class NovagentSession:
+    def __init__(
+        self,
+        model: ModelWrapper,
+        context: PythonContext,
+        output: Callable[[str, str | None], None],
+        system_prompt: str,
+    ):
+        self.model = model
+        self.context = context
+        self.output = output
         self.nsteps = 0
         self.in_tokens = 0
         self.out_tokens = 0
         self.messages = [
-            {"role": "system", "content": self.system_prompt},
+            {"role": "system", "content": system_prompt},
         ]
 
     def run(self, task: str) -> str:
@@ -64,7 +76,7 @@ class Novagent:
         # loop until a final answer.
         while not self.context.has_final_answer:
             # get the model response from the current list of messages.
-            message, in_tokens, out_tokens = self._call_model()
+            message, in_tokens, out_tokens = self.model(self.messages)
 
             # update the current step info and log it.
             self.nsteps += 1
@@ -113,25 +125,6 @@ class Novagent:
             self._log_current_tokens()
 
         return self.context.final_answer_value
-
-    def _call_model(self) -> tuple[str, int | None, int | None]:
-        response = self.model(self.messages)
-
-        if isinstance(response, str):
-            return response, None, None
-
-        if isinstance(response, tuple) and len(response) == 3:
-            message, in_tokens, out_tokens = response
-            if (
-                isinstance(message, str)
-                and (not in_tokens or isinstance(in_tokens, int))
-                and (not out_tokens or isinstance(out_tokens, int))
-            ):
-                return message, in_tokens, out_tokens
-
-        raise ValueError(
-            "Model function must return string or tuple[str, int | None, int | None]."
-        )
 
     def _add_user_message(self, content: str):
         self.messages.append({"role": "user", "content": content})

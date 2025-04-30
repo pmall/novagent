@@ -1,5 +1,5 @@
 import os
-from agent import Novagent
+from agent import NovagentConfig
 from models import LiteLLMModel
 from outputs import CliOutput
 
@@ -31,9 +31,11 @@ if __name__ == "__main__":
 
     model = LiteLLMModel(api_key=API_KEY, model_id=MODEL_ID)
 
-    agent = Novagent(model, output=CliOutput(), extra_instructions=EXTRA_INSTRUCTIONS)
+    config = NovagentConfig(model, extra_instructions=EXTRA_INSTRUCTIONS)
 
-    agent.run(args.task)
+    session = config.session(CliOutput())
+
+    session.run(args.task)
 
     while True:
         more = input("Is this ok? (q to quit)\n> ")
@@ -41,4 +43,4 @@ if __name__ == "__main__":
         if more.lower() == "q":
             break
 
-        agent.run(more)
+        session.run(more)

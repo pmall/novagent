@@ -4,6 +4,32 @@ from loggers import DummyLogger
 from system_prompt import END_CODE_TAG
 
 
+class ModelWrapper:
+    def __init__(
+        self, model: Callable[[list[dict]], str | tuple[str, int | None, int | None]]
+    ):
+        self.model = model
+
+    def __call__(self, messages: list[dict]) -> tuple[str, int | None, int | None]:
+        response = self.model(messages)
+
+        if isinstance(response, str):
+            return response, None, None
+
+        if isinstance(response, tuple) and len(response) == 3:
+            message, in_tokens, out_tokens = response
+            if (
+                isinstance(message, str)
+                and (not in_tokens or isinstance(in_tokens, int))
+                and (not out_tokens or isinstance(out_tokens, int))
+            ):
+                return message, in_tokens, out_tokens
+
+        raise ValueError(
+            "Model function must return string or tuple[str, int | None, int | None]."
+        )
+
+
 class LiteLLMModel:
     def __init__(
         self,
