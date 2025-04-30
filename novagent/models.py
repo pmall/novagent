@@ -1,7 +1,7 @@
 from typing import Callable
 from litellm import completion
+from loggers import DummyLogger
 from system_prompt import END_CODE_TAG
-from trace_loggers import DummyTraceLogger
 
 
 class LiteLLMModel:
@@ -10,12 +10,12 @@ class LiteLLMModel:
         model_id: str,
         api_key: str | None = None,
         api_base: str | None = None,
-        trace_logger: Callable[[list[dict], object], None] | None = None,
+        logger: Callable[[list[dict], dict], None] | None = None,
     ):
         self.model_id = model_id
         self.api_key = api_key
         self.api_base = api_base
-        self.trace_logger = trace_logger or DummyTraceLogger()
+        self.log = logger or DummyLogger()
 
     def __call__(self, messages: list[dict]) -> tuple[str, int | None, int | None]:
         response = completion(
@@ -27,7 +27,7 @@ class LiteLLMModel:
             drop_params=True,
         )
 
-        self.trace_logger(messages, response.to_dict())
+        self.log(messages, response.to_dict())
 
         message = response.choices[0].message.content
 

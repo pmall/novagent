@@ -1,7 +1,7 @@
 import re
 from typing import Callable
 from context import PythonContext
-from loggers import LogLevel, LogAction, DummyLogger
+from outputs import MessageType, DummyOutput
 from system_prompt import END_CODE_TAG, default_system_prompt_template
 
 
@@ -20,15 +20,14 @@ class Novagent:
         self,
         model: Callable[[list[dict]], str | tuple[str, int | None, int | None]],
         context: PythonContext | None = None,
-        logger: Callable[[str, str | None], None] | None = None,
-        log_level: LogLevel | None = LogLevel.NORMAL,
+        output: Callable[[str, str | None], None] | None = None,
         authorized_imports: list[str] = [],
         extra_instructions: str | None = None,
         system_prompt_template: Callable[[list[str], list[str], list[str]], str] = None,
     ):
         self.model = model
         self.context = context or PythonContext()
-        self.log = logger or DummyLogger(level=log_level)
+        self.output = output or DummyOutput()
 
         self.authorized_imports = (
             authorized_imports or Novagent.DEFAULT_AUTHORIZED_IMPORTS
@@ -58,7 +57,7 @@ class Novagent:
         self.context.clear_final_answer()
 
         # start by adding the task in the message list.
-        self.log(f"Task: {task}", LogAction.INFO)
+        self.output(f"Task: {task}", MessageType.INFO)
 
         self._add_user_message(f"Task: {task}")
 
@@ -69,19 +68,19 @@ class Novagent:
 
             # update the current step info and log it.
             self.nsteps += 1
-            self.log(f"Step {self.nsteps}:", LogAction.INFO)
+            self.output(f"Step {self.nsteps}:", MessageType.INFO)
 
             # try to extract thought and code from the model response.
             thought, code = self._extract_thought_and_code(message)
 
             if not code:
-                self.log(thought, LogAction.THOUGHT)
-                self.log("agent did not produced code.", LogAction.ERROR)
+                self.output(thought, MessageType.THOUGHT)
+                self.output("agent did not produced code.", MessageType.ERROR)
                 continue
 
             # handle the produced code.
-            self.log(thought, LogAction.THOUGHT)
-            self.log(code, LogAction.CODE)
+            self.output(thought, MessageType.THOUGHT)
+            self.output(code, MessageType.CODE)
 
             self._add_assistant_message(f"{thought}\n```py\n{code}\n```{END_CODE_TAG}")
 
@@ -89,17 +88,17 @@ class Novagent:
 
             # no final answer yet so we add the produced messages to the list and loop.
             if self.context.has_final_answer:
-                self.log(self.context.final_answer_value, LogAction.FINAL)
+                self.output(self.context.final_answer_value, MessageType.FINAL)
                 self._add_user_message(f"Final:\n{self.context.final_answer_value}")
             else:
                 parts = []
 
                 if len(out) > 0:
-                    self.log(out, LogAction.OUTPUT)
+                    self.output(out, MessageType.OUTPUT)
                     parts.append(out)
 
                 if len(err) > 0:
-                    self.log(err, LogAction.ERROR)
+                    self.output(err, MessageType.ERROR)
                     parts.append(err)
 
                 self._add_user_message(f"Observation:\n{"\n".join(parts)}")
@@ -153,19 +152,19 @@ class Novagent:
 
     def _log_current_tokens(self):
         if self.in_tokens and not self.out_tokens:
-            self.log(
+            self.output(
                 f"Total tokens {self.in_tokens} (in: {self.in_tokens}  - out: ?)",
-                LogAction.INFO,
+                MessageType.INFO,
             )
 
         if not self.in_tokens and self.out_tokens:
-            self.log(
+            self.output(
                 f"Total tokens {self.out_tokens} (in: ? - out: {self.out_tokens})",
-                LogAction.INFO,
+                MessageType.INFO,
             )
 
         if self.in_tokens and self.out_tokens:
-            self.log(
+            self.output(
                 f"Total tokens {self.in_tokens + self.out_tokens} (in: {self.in_tokens} - out: {self.out_tokens})",
-                LogAction.INFO,
+                MessageType.INFO,
             )
