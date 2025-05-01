@@ -1,4 +1,4 @@
-import re
+import time
 import asyncio
 from novagent.session import MessageType, NovagentSession
 
@@ -53,6 +53,11 @@ class CliRunner:
     """
     A runner that executes a session and outputs colored messages to the terminal.
 
+    Features:
+    - Character-by-character printing with configurable delay to simulate text generation
+    - Color-coded output by message type
+    - Special highlighting for Python code blocks
+
     Colors by MessageType:
     - INFO: Grey
     - AGENT: White (Python code blocks are displayed in yellow)
@@ -81,11 +86,19 @@ class CliRunner:
         MessageType.FINAL: COLORS["GREEN"],
     }
 
-    def __init__(self, session: NovagentSession):
+    def __init__(self, session: NovagentSession, char_delay=0.001):
+        """
+        Initialize the CliRunner.
+
+        Args:
+            session (NovagentSession): The novagent session to run
+            char_delay (float): Delay in seconds between printing each character (default: 1ms)
+        """
         self.session = session
         self.current_step = None
         self.current_type = None
         self.in_code_block = False
+        self.char_delay = char_delay
 
     def run(self, task: str) -> str | None:
         return asyncio.run(self._run(task))
@@ -93,10 +106,11 @@ class CliRunner:
     async def _run(self, task: str) -> str | None:
         async for message in self.session.arun(task):
             if message.step != self.current_step:
-                print(
+                self._print_with_delay(
                     self.COLORS["GREY"]
                     + "================================================================================"
                     + self.COLORS["RESET"]
+                    + "\n"
                 )
                 self.current_type = None
                 self.current_step = message.step
@@ -104,101 +118,94 @@ class CliRunner:
 
             if message.type != self.current_type:
                 if self.current_type == MessageType.AGENT:
-                    print("")
+                    self._print_with_delay("\n")
 
                 color = self.TYPE_COLORS.get(message.type, self.COLORS["WHITE"])
-                print(f"{color}[{message.type.name}]{self.COLORS['RESET']}")
+                self._print_with_delay(
+                    f"{color}[{message.type.name}]{self.COLORS['RESET']}\n"
+                )
                 self.current_type = message.type
 
-            # Process the content with handling for code blocks
-            self._process_content(message.content, message.type)
-
-            # Add newline for non-AGENT messages
-            if message.type != MessageType.AGENT:
-                print("")
+            # Special handling for AGENT messages
+            if message.type == MessageType.AGENT:
+                # Handle potential code blocks in the content
+                self._handle_agent_content(message.content)
+            else:
+                # For non-AGENT messages, just print with the appropriate color
+                color = self.TYPE_COLORS.get(message.type, self.COLORS["WHITE"])
+                self._print_with_delay(
+                    f"{color}{message.content}{self.COLORS['RESET']}\n"
+                )
 
         return self.session.final_answer_value()
 
-    def _process_content(self, content: str, message_type: MessageType):
-        """Process content with special handling for code blocks in AGENT messages."""
-        if message_type != MessageType.AGENT:
-            # For non-AGENT messages, just print with the appropriate color
-            color = self.TYPE_COLORS.get(message_type, self.COLORS["WHITE"])
-            print(f"{color}{content}{self.COLORS['RESET']}", end="")
-            return
-
-        # For AGENT messages, handle code blocks
+    def _handle_agent_content(self, content: str):
+        """Handle agent messages with special processing for code blocks."""
         code_start = "```py"
         code_end = "```"
 
-        # Check for code block markers in this chunk
+        # Look for code block markers in the content
         if code_start in content:
-            # We found the start of a code block
-            parts = content.split(code_start, 1)
+            # Split at code block start and process each part
+            before_code, after_start = content.split(code_start, 1)
 
-            # Print the text before the code block
-            print(
-                f"{self.TYPE_COLORS[MessageType.AGENT]}{parts[0]}{self.COLORS['RESET']}",
-                end="",
+            # Print content before code block
+            if before_code:
+                self._print_with_delay(
+                    f"{self.TYPE_COLORS[MessageType.AGENT]}{before_code}{self.COLORS['RESET']}"
+                )
+
+            # Print code start marker
+            self._print_with_delay(f"{self.COLORS['YELLOW']}{code_start}")
+
+            # Check if code block ends in same chunk
+            if code_end in after_start:
+                code_content, after_code = after_start.split(code_end, 1)
+                # Print code content and end marker
+                self._print_with_delay(
+                    f"{self.COLORS['YELLOW']}{code_content}{code_end}{self.COLORS['RESET']}"
+                )
+                # Print content after code block
+                if after_code:
+                    self._print_with_delay(
+                        f"{self.TYPE_COLORS[MessageType.AGENT]}{after_code}{self.COLORS['RESET']}"
+                    )
+            else:
+                # Code block continues beyond this chunk
+                self._print_with_delay(
+                    f"{self.COLORS['YELLOW']}{after_start}{self.COLORS['RESET']}"
+                )
+                self.in_code_block = True
+
+        elif code_end in content and self.in_code_block:
+            # This chunk contains the end of a code block
+            before_end, after_end = content.split(code_end, 1)
+
+            # Print code content and end marker
+            self._print_with_delay(
+                f"{self.COLORS['YELLOW']}{before_end}{code_end}{self.COLORS['RESET']}"
             )
 
-            # Print the code start marker
-            print(f"{self.COLORS['YELLOW']}{code_start}", end="")
+            # Print content after code block
+            if after_end:
+                self._print_with_delay(
+                    f"{self.TYPE_COLORS[MessageType.AGENT]}{after_end}{self.COLORS['RESET']}"
+                )
 
-            # Set that we're in a code block
-            self.in_code_block = True
-
-            # Process the rest of the content
-            self._process_code_content(parts[1])
-        elif code_end in content and self.in_code_block:
-            # We found the end of a code block
-            parts = content.split(code_end, 1)
-
-            # Print the code content
-            print(f"{self.COLORS['YELLOW']}{parts[0]}", end="")
-
-            # Print the code end marker
-            print(f"{self.COLORS['YELLOW']}{code_end}{self.COLORS['RESET']}", end="")
-
-            # Set that we're no longer in a code block
+            # We're no longer in a code block
             self.in_code_block = False
 
-            # Print the text after the code block
-            print(
-                f"{self.TYPE_COLORS[MessageType.AGENT]}{parts[1]}{self.COLORS['RESET']}",
-                end="",
-            )
         else:
-            # Regular content, or content within a code block
+            # Regular content or content within a code block
             color = (
                 self.COLORS["YELLOW"]
                 if self.in_code_block
                 else self.TYPE_COLORS[MessageType.AGENT]
             )
-            print(f"{color}{content}{self.COLORS['RESET']}", end="")
+            self._print_with_delay(f"{color}{content}{self.COLORS['RESET']}")
 
-    def _process_code_content(self, content: str):
-        """Process content that comes after a code block start."""
-        code_end = "```"
-
-        if code_end in content:
-            # The code block ends in the same chunk
-            parts = content.split(code_end, 1)
-
-            # Print the code content
-            print(f"{self.COLORS['YELLOW']}{parts[0]}", end="")
-
-            # Print the code end marker
-            print(f"{self.COLORS['YELLOW']}{code_end}{self.COLORS['RESET']}", end="")
-
-            # Set that we're no longer in a code block
-            self.in_code_block = False
-
-            # Print the text after the code block
-            print(
-                f"{self.TYPE_COLORS[MessageType.AGENT]}{parts[1]}{self.COLORS['RESET']}",
-                end="",
-            )
-        else:
-            # The code block continues
-            print(f"{self.COLORS['YELLOW']}{content}{self.COLORS['RESET']}", end="")
+    def _print_with_delay(self, text):
+        """Print text character by character with a small delay between each character."""
+        for char in text:
+            print(char, end="", flush=True)
+            time.sleep(self.char_delay)
