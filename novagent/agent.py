@@ -1,9 +1,10 @@
 import re
+import asyncio
 from typing import Callable
-from models import ModelWrapper
-from context import PythonContext
-from outputs import MessageType, DummyOutput
-from system_prompt import END_CODE_TAG, default_system_prompt_template
+from novagent.models import ModelWrapper
+from novagent.context import PythonContext
+from novagent.outputs import MessageType, DummyOutput
+from novagent.system_prompt import END_CODE_TAG, default_system_prompt_template
 
 
 class NovagentConfig:
@@ -65,11 +66,14 @@ class NovagentSession:
         ]
 
     def run(self, task: str) -> str:
+        asyncio.run(self.arun(task))
+
+    async def arun(self, task: str) -> str:
         # clear the last final answer when run is called again.
         self.context.clear_final_answer()
 
         # start by adding the task in the message list.
-        self.output(f"Task: {task}", MessageType.INFO)
+        await self.output(f"Task: {task}", MessageType.INFO)
 
         self._add_user_message(f"Task: {task}")
 
@@ -80,19 +84,19 @@ class NovagentSession:
 
             # update the current step info and log it.
             self.nsteps += 1
-            self.output(f"Step {self.nsteps}:", MessageType.INFO)
+            await self.output(f"Step {self.nsteps}:", MessageType.INFO)
 
             # try to extract thought and code from the model response.
             thought, code = self._extract_thought_and_code(message)
 
             if not code:
-                self.output(thought, MessageType.THOUGHT)
-                self.output("agent did not produced code.", MessageType.ERROR)
+                await self.output(thought, MessageType.THOUGHT)
+                await self.output("agent did not produced code.", MessageType.ERROR)
                 continue
 
             # handle the produced code.
-            self.output(thought, MessageType.THOUGHT)
-            self.output(code, MessageType.CODE)
+            await self.output(thought, MessageType.THOUGHT)
+            await self.output(code, MessageType.CODE)
 
             self._add_assistant_message(f"{thought}\n```py\n{code}\n```{END_CODE_TAG}")
 
@@ -100,17 +104,17 @@ class NovagentSession:
 
             # no final answer yet so we add the produced messages to the list and loop.
             if self.context.has_final_answer:
-                self.output(self.context.final_answer_value, MessageType.FINAL)
+                await self.output(self.context.final_answer_value, MessageType.FINAL)
                 self._add_user_message(f"Final:\n{self.context.final_answer_value}")
             else:
                 parts = []
 
                 if len(out) > 0:
-                    self.output(out, MessageType.OUTPUT)
+                    await self.output(out, MessageType.OUTPUT)
                     parts.append(out)
 
                 if len(err) > 0:
-                    self.output(err, MessageType.ERROR)
+                    await self.output(err, MessageType.ERROR)
                     parts.append(err)
 
                 self._add_user_message(f"Observation:\n{"\n".join(parts)}")
@@ -122,7 +126,9 @@ class NovagentSession:
             if out_tokens:
                 self.out_tokens += out_tokens
 
-            self._log_current_tokens()
+            await self._log_current_tokens()
+
+        await self.output("", MessageType.DONE)
 
         return self.context.final_answer_value
 
@@ -143,21 +149,21 @@ class NovagentSession:
 
         return thought, code
 
-    def _log_current_tokens(self):
+    async def _log_current_tokens(self):
         if self.in_tokens and not self.out_tokens:
-            self.output(
+            await self.output(
                 f"Total tokens {self.in_tokens} (in: {self.in_tokens}  - out: ?)",
                 MessageType.INFO,
             )
 
         if not self.in_tokens and self.out_tokens:
-            self.output(
+            await self.output(
                 f"Total tokens {self.out_tokens} (in: ? - out: {self.out_tokens})",
                 MessageType.INFO,
             )
 
         if self.in_tokens and self.out_tokens:
-            self.output(
+            await self.output(
                 f"Total tokens {self.in_tokens + self.out_tokens} (in: {self.in_tokens} - out: {self.out_tokens})",
                 MessageType.INFO,
             )

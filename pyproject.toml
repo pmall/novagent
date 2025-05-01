@@ -5,6 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cachetools>=5.5.2",
+    "fastapi>=0.115.12",
     "jinja2>=3.1.6",
     "litellm==1.67.2",
+    "pydantic>=2.11.3",
+    "uvicorn>=0.34.2",
 ]

@@ -1,7 +1,7 @@
 from typing import Callable
 from litellm import completion
-from loggers import DummyLogger
-from system_prompt import END_CODE_TAG
+from novagent.loggers import DummyLogger
+from novagent.system_prompt import END_CODE_TAG
 
 
 class ModelWrapper:
