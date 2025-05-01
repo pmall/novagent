@@ -1,7 +1,7 @@
 from typing import Callable, Any
 from novagent.context import PythonContext
 from novagent.session import NovagentSession
-from novagent.runners import DummyRunner, PrintRunner
+from novagent.runners import DummyRunner, StdoutRunner
 from novagent.system_prompt import default_system_prompt_template
 
 
@@ -46,4 +46,4 @@ class NovagentConfig:
         return DummyRunner(self.session())
 
     def print(self):
-        return PrintRunner(self.session())
+        return StdoutRunner(self.session())

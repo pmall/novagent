@@ -15,7 +15,7 @@ class DummyRunner:
         return self.session.final_answer_value()
 
 
-class PrintRunner:
+class StdoutRunner:
     def __init__(self, session: NovagentSession):
         self.session = session
 
