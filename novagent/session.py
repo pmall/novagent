@@ -80,9 +80,6 @@ class NovagentSession:
             # add the assistant message in the list.
             self._add_assistant_message(f"{thought}\n```py\n{code}\n```{END_CODE_TAG}")
 
-            # yield current step sumup.
-            yield Message(MessageType.INFO, self.nstep, self._step_sumup())
-
             # run the produced code.
             out, err = self.context.run(code)
 
@@ -106,6 +103,9 @@ class NovagentSession:
                     MessageType.FINAL, self.nstep, self.context.final_answer_value
                 )
                 parts.append(f"Final:\n{self.context.final_answer_value}")
+
+            # yield end of step sumup.
+            yield Message(MessageType.INFO, self.nstep, self._current_step_info())
 
             self._add_user_message("\n".join(parts))
 
@@ -146,7 +146,7 @@ class NovagentSession:
 
         return thought, code
 
-    def _step_sumup(self) -> str:
+    def _current_step_info(self) -> str:
         """Get a formatted string with token usage information."""
 
         base = f"Step {self.nstep}"
