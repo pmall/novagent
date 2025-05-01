@@ -14,12 +14,13 @@ class MessageType(Enum):
 
 
 class Message:
-    def __init__(self, type: MessageType, content: str):
+    def __init__(self, type: MessageType, step: int, content: str):
         self.type = type
+        self.step = step
         self.content = content
 
     def __repr__(self):
-        return f"Message({self.type.name}, {self.content})"
+        return f"Message({self.type.name}, {self.step}, {self.content})"
 
 
 class NovagentSession:
@@ -36,7 +37,7 @@ class NovagentSession:
     ):
         self.model = model
         self.context = context
-        self.nsteps = 0
+        self.nstep = 0
         self.prompt_tokens = 0
         self.completion_tokens = 0
         self.messages = [
@@ -48,15 +49,12 @@ class NovagentSession:
 
     async def arun(self, task: str) -> AsyncIterator[Message]:
         """
-        Run the session on the given task and yield messages as they are produced.
+        Run the session on the given task and yield messages as they, self.nstep are produced.
         This is an async generator that can be used in an async for loop.
         """
 
         # clear the last final answer when run is called again.
         self.context.clear_final_answer()
-
-        # yield the task info.
-        yield Message(MessageType.INFO, f"Task: {task}")
 
         # add the task to the message list.
         self._add_user_message(f"Task: {task}")
@@ -64,13 +62,9 @@ class NovagentSession:
         # loop until a final answer.
         while not self.context.has_final_answer:
             # update the current step info and yield it.
-            self.nsteps += 1
+            self.nstep += 1
 
-            yield Message(MessageType.INFO, f"Step {self.nsteps}:")
-
-            # get the model response from the current list of messages.
-
-            # consume the response stream.
+            # get model response as a stream and emit it.
             message = ""
             async for agent_message in self._call_model():
                 yield agent_message
@@ -80,11 +74,14 @@ class NovagentSession:
             thought, code = self._extract_thought_and_code(message)
 
             if not code:
-                yield Message(MessageType.ERROR, f"No code produced.")
+                yield Message(MessageType.ERROR, self.nstep, f"No code produced.")
                 break
 
             # add the assistant message in the list.
             self._add_assistant_message(f"{thought}\n```py\n{code}\n```{END_CODE_TAG}")
+
+            # yield current step sumup.
+            yield Message(MessageType.INFO, self.nstep, self._step_sumup())
 
             # run the produced code.
             out, err = self.context.run(code)
@@ -94,27 +91,23 @@ class NovagentSession:
             observations = []
 
             if len(out) > 0:
-                yield Message(MessageType.OUTPUT, out)
+                yield Message(MessageType.OUTPUT, self.nstep, out)
                 observations.append(out)
 
             if len(err) > 0:
-                yield Message(MessageType.ERROR, err)
+                yield Message(MessageType.ERROR, self.nstep, err)
                 observations.append(err)
 
             if len(observations) > 0:
                 parts.append(f"Observation:\n{"\n".join(observations)}")
 
             if self.context.has_final_answer:
-                yield Message(MessageType.FINAL, self.context.final_answer_value)
+                yield Message(
+                    MessageType.FINAL, self.nstep, self.context.final_answer_value
+                )
                 parts.append(f"Final:\n{self.context.final_answer_value}")
 
             self._add_user_message("\n".join(parts))
-
-            # log current step tokens consumption
-            token_info = self._get_token_info()
-
-            if token_info:
-                yield Message(MessageType.INFO, token_info)
 
     def _add_user_message(self, content: str):
         self.messages.append({"role": "user", "content": content})
@@ -132,7 +125,7 @@ class NovagentSession:
 
             if content:
                 # Yield each chunk as it arrives
-                yield Message(MessageType.AGENT, content)
+                yield Message(MessageType.AGENT, self.nstep, content)
 
             if prompt_tokens:
                 self.prompt_tokens = self.prompt_tokens + prompt_tokens
@@ -153,18 +146,18 @@ class NovagentSession:
 
         return thought, code
 
-    def _get_token_info(self) -> str | None:
+    def _step_sumup(self) -> str:
         """Get a formatted string with token usage information."""
 
+        base = f"Step {self.nstep}"
+
         if not self.prompt_tokens and not self.completion_tokens:
-            return None
+            return base
 
         if self.prompt_tokens and not self.completion_tokens:
-            return (
-                f"Total tokens {self.prompt_tokens} (in: {self.prompt_tokens} - out: ?)"
-            )
+            return f"{base} - Total tokens {self.prompt_tokens} (in: {self.prompt_tokens} - out: ?)"
 
         if not self.prompt_tokens and self.completion_tokens:
-            return f"Total tokens {self.completion_tokens} (in: ? - out: {self.completion_tokens})"
+            return f"{base} - Total tokens {self.completion_tokens} (in: ? - out: {self.completion_tokens})"
 
-        return f"Total tokens {self.prompt_tokens + self.completion_tokens} (in: {self.prompt_tokens} - out: {self.completion_tokens})"
+        return f"{base} - Total tokens {self.prompt_tokens + self.completion_tokens} (in: {self.prompt_tokens} - out: {self.completion_tokens})"
