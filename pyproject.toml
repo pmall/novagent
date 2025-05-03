@@ -10,5 +10,9 @@ dependencies = [
     "jinja2>=3.1.6",
     "litellm==1.67.2",
     "pydantic>=2.11.3",
+]
+
+[dependency-groups]
+dev = [
     "uvicorn>=0.34.2",
 ]

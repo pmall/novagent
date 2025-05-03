@@ -563,6 +563,10 @@ dependencies = [
     { name = "jinja2" },
     { name = "litellm" },
     { name = "pydantic" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "uvicorn" },
 ]
 
@@ -573,8 +577,10 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "litellm", specifier = "==1.67.2" },
     { name = "pydantic", specifier = ">=2.11.3" },
-    { name = "uvicorn", specifier = ">=0.34.2" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "uvicorn", specifier = ">=0.34.2" }]
 
 [[package]]
 name = "openai"
